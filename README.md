@@ -14,15 +14,19 @@ User Resource and Identity management.
 
 ## Project Tools
 
-1. NestJS : Framework
+1. Node Framework: Nest JS
 2. Database: MySQL
-3. UNIT TEST: JEST
+3. ORM: TypeORM
+4. Validator: class-validator: JWT & Passport
+5. Encryption: BcryptJS
+6. Authentication & Authorization: 
+7. Test cases: Jest & supertest
    
 
 
 ## Project setup
 
-copy .env-example to root and rename it to .evn 
+copy .env-example to root and rename it to .enV 
 
 ```bash
 
