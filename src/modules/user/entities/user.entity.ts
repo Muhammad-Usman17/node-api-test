@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, BeforeInsert } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import { IUser } from '../Interfaces/user.interface';
 
 export enum UserRole {
   USER = 'USER',
@@ -7,7 +8,7 @@ export enum UserRole {
 }
 
 @Entity({ name: 'User' })
-export class UserEntity {
+export class UserEntity implements IUser {
   @PrimaryGeneratedColumn()
   id: number;
 
