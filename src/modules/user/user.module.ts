@@ -16,7 +16,7 @@ import { UserEntity } from './entities/user.entity';
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your_secret_key', // Replace with a strong secret
-      signOptions: { expiresIn: '1h' },
+      signOptions: { expiresIn: '24h' },
     }),
   ],
   controllers: [UserController], // Register the UserController

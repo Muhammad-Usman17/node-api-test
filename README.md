@@ -44,5 +44,9 @@ $ pnpm run start:prod
 # unit tests
 $ pnpm run test
 
+# e2e tests
+$ pnpm run test:e2e
+
+
 ```
 

@@ -1,143 +1,160 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UserController } from './user.controller';
+import { UserService } from './user.service';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
-import { JwtService } from '@nestjs/jwt';
-import { Like, Repository } from 'typeorm';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
-import { getRepositoryToken } from '@nestjs/typeorm';
-import * as request from 'supertest';
-import { AppModule } from '../../app.module';
-import { UserEntity, UserRole } from './entities/user.entity';
+import { RolesGuard } from '../../guards/roles.guard';
+import { AuthGuard } from '../../guards/auth.guard';
 
 describe('UserController', () => {
-  let app;
-  let jwtService: JwtService;
-  let userRepository: Repository<UserEntity>;
+  let userController: UserController;
+  let userService: UserService;
 
-  beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [UserController],
+      providers: [
+        {
+          provide: UserService,
+          useValue: {
+            createUser: jest.fn(),
+            findOne: jest.fn(),
+            findAll: jest.fn(),
+            updateUser: jest.fn(),
+            deleteUser: jest.fn(),
+            removeUser: jest.fn(),
+          },
+        },
+      ],
+    })
+      .overrideGuard(AuthGuard)
+      .useValue(jest.fn(() => true))
+      .overrideGuard(RolesGuard)
+      .useValue(jest.fn(() => true))
+      .compile();
 
-    app = moduleRef.createNestApplication();
-    await app.init();
-
-    jwtService = moduleRef.get<JwtService>(JwtService);
-    userRepository = moduleRef.get<Repository<UserEntity>>(
-      getRepositoryToken(UserEntity),
-    );
+    userController = module.get<UserController>(UserController);
+    userService = module.get<UserService>(UserService);
   });
 
-  // Helper function to create a user with a specific role
-  const createUser = async (role: UserRole) => {
-    const user = new UserEntity();
-    user.name = 'Test User';
-    user.email = `testuser${Date.now()}@example.com`;
-    user.password = 'password';
-    user.role = role;
-    const token = generateToken(user);
-    user.accessToken = token;
-    return await userRepository.save(user);
+  const mockUser = {
+    id: 1,
+    name: 'Test User',
+    email: 'testuser@example.com',
+    role: 'USER',
+    password: 'hashedpassword',
   };
 
-  // Helper function to generate a JWT token
-  const generateToken = (user) => {
-    return jwtService.sign({ ...user, sub: Date.now() });
+  const mockAdmin = {
+    id: 2,
+    name: 'Admin User',
+    email: 'admin@example.com',
+    role: 'ADMIN',
+    password: 'hashedpassword',
+  };
+  const mockReq = {
+    user: { role: 'USER', id: mockUser.id },
+  };
+  const mockAdminReq = {
+    user: { role: 'ADMIN', id: mockAdmin.id },
   };
 
-  it('USER should be able to view their own details', async () => {
-    const user = await createUser(UserRole.ADMIN);
+  describe('createUser', () => {
+    it('should create a new user', async () => {
+      const createUserDto: CreateUserDto = {
+        name: 'New User',
+        email: 'newuser@example.com',
+        password: 'password',
+      };
 
-    const response = await request(app.getHttpServer())
-      .get(`/users/${user.id}`)
-      .set('Authorization', `Bearer ${user.accessToken}`)
-      .expect(200);
+      jest.spyOn(userService, 'createUser').mockResolvedValue(mockUser as any);
 
-    expect(response.body).toMatchObject({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      const result = await userController.create(createUserDto);
+      expect(result).toEqual(mockUser);
+      expect(userService.createUser).toHaveBeenCalledWith(createUserDto);
     });
   });
 
-  it("USER should not be able to view other users' details", async () => {
-    const user1 = await createUser(UserRole.USER);
-    const user2 = await createUser(UserRole.USER);
+  describe('findOne', () => {
+    it('should return a user by ID', async () => {
+      jest.spyOn(userService, 'findOne').mockResolvedValue(mockUser as any);
 
-    await request(app.getHttpServer())
-      .get(`/users/${user2.id}`)
-      .set('Authorization', `Bearer ${user1.accessToken}`)
-      .expect(403);
-  });
-
-  it('ADMIN should be able to get a list of users', async () => {
-    const admin = await createUser(UserRole.ADMIN);
-
-    const response = await request(app.getHttpServer())
-      .get('/users')
-      .set('Authorization', `Bearer ${admin.accessToken}`)
-      .expect(200);
-
-    expect(Array.isArray(response.body)).toBe(true);
-  });
-
-  it('ADMIN should be able to update the details of another user', async () => {
-    const admin = await createUser(UserRole.ADMIN);
-    const user = await createUser(UserRole.ADMIN);
-
-    const updatedUserDetails = {
-      name: 'Updated Name',
-      email: 'testuserupdatedemail@example.com',
-    };
-
-    const response = await request(app.getHttpServer())
-      .patch(`/users/${user.id}`)
-      .set('Authorization', `Bearer ${admin.accessToken}`)
-      .send(updatedUserDetails)
-      .expect(200);
-
-    expect(response.body).toMatchObject(updatedUserDetails);
-  });
-
-  it('ADMIN should be able to delete another user', async () => {
-    const admin = await createUser(UserRole.ADMIN);
-    const user = await createUser(UserRole.USER);
-
-    await request(app.getHttpServer())
-      .delete(`/users/${user.id}`)
-      .set('Authorization', `Bearer ${admin.accessToken}`)
-      .expect(200);
-
-    // Verify user is deleted
-    await request(app.getHttpServer())
-      .get(`/users/${user.id}`)
-      .set('Authorization', `Bearer ${admin.accessToken}`)
-      .expect(404);
-  });
-
-  it('No role should be able to delete themselves', async () => {
-    const user = await createUser(UserRole.USER);
-
-    await request(app.getHttpServer())
-      .delete(`/users/${user.id}`)
-      .set('Authorization', `Bearer ${user.accessToken}`)
-      .expect(403);
-  });
-
-  it('Should return 404 for ADMIN trying to access non-existent user', async () => {
-    const admin = await createUser(UserRole.ADMIN);
-
-    await request(app.getHttpServer())
-      .get(`/users/99999`)
-      .set('Authorization', `Bearer ${admin.accessToken}`)
-      .expect(404);
-  });
-
-  afterAll(async () => {
-    const testUsers = await userRepository.find({
-      where: { email: Like('testuser%') },
+      const result = await userController.findOne(mockUser.id, mockReq);
+      expect(result).toEqual(mockUser);
+      expect(userService.findOne).toHaveBeenCalledWith(mockUser.id);
     });
-    await userRepository.remove(testUsers);
-    await app.close();
+
+    it('should throw NotFoundException if user is not found', async () => {
+      jest
+        .spyOn(userService, 'findOne')
+        .mockRejectedValue(new NotFoundException());
+
+      await expect(userController.findOne(99999, mockAdminReq)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('updateUser', () => {
+    it('should update a user', async () => {
+      const updateUserDto: UpdateUserDto = { name: 'Updated Name' };
+      const updatedUser = { ...mockUser, name: 'Updated Name' };
+
+      jest
+        .spyOn(userService, 'updateUser')
+        .mockResolvedValue(updatedUser as any);
+
+      const result = await userController.update(
+        mockUser.id,
+        updateUserDto,
+        mockReq,
+      );
+      expect(result).toEqual(updatedUser);
+      expect(userService.updateUser).toHaveBeenCalledWith(
+        mockUser.id,
+        updateUserDto,
+      );
+    });
+
+    it('should throw NotFoundException if user to update is not found', async () => {
+      jest
+        .spyOn(userService, 'updateUser')
+        .mockRejectedValue(new NotFoundException());
+
+      await expect(
+        userController.update(99999, { name: 'Updated Name' }, mockAdminReq),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('removeUser', () => {
+    it('should delete a user', async () => {
+      jest.spyOn(userService, 'findOne').mockResolvedValue(mockUser as any);
+      jest.spyOn(userService, 'removeUser').mockResolvedValue(undefined);
+
+      const result = await userController.remove(mockUser.id, mockAdminReq);
+      expect(result).toBeUndefined();
+      expect(userService.removeUser).toHaveBeenCalledWith(mockUser.id);
+    });
+
+    it('should throw ForbiddenException if user tries to delete itself', async () => {
+      await expect(async () => {
+        await userController.remove(mockAdmin.id, mockAdminReq);
+      }).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return a list of users', async () => {
+      const mockUsers = [mockUser, mockAdmin];
+      jest.spyOn(userService, 'findAll').mockResolvedValue(mockUsers as any);
+
+      const result = await userController.findAll();
+      expect(result).toEqual(mockUsers);
+      expect(userService.findAll).toHaveBeenCalled();
+    });
   });
 });
