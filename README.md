@@ -17,9 +17,9 @@ User Resource and Identity management.
 1. Node Framework: Nest JS
 2. Database: MySQL
 3. ORM: TypeORM
-4. Validator: class-validator: JWT & Passport
+4. Validator: class-validator
 5. Encryption: BcryptJS
-6. Authentication & Authorization: 
+6. Authentication & Authorization: JWT & Passport
 7. Test cases: Jest & supertest
    
 
