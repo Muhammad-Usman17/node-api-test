@@ -12,9 +12,17 @@ User Resource and Identity management.
 7. USERS attempting to view things they are not allowed to do should receive the correct status code.
 8. ADMINS attempting to do things to non-existent users should receive the correct status codes.
 
+## Project Tools
+
+1. NestJS : Framework
+2. Database: MySQL
+3. UNIT TEST: JEST
+   
 
 
 ## Project setup
+
+copy .env-example to root and rename it to .evn 
 
 ```bash
 
