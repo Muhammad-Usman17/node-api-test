@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
   // Enable global validation pipe
   app.useGlobalPipes(
@@ -23,6 +25,8 @@ async function bootstrap() {
       },
     }),
   );
-  await app.listen(4000);
+
+  const port = configService.get<number>('PORT');
+  await app.listen(port);
 }
 bootstrap();
